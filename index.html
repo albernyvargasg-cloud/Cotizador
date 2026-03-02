@@ -305,7 +305,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--off);color:var(--text);mi
           </div>
           <div class="field">
             <label>Tipo de vehículo</label>
-            <select id="veh-tipo">
+            <select id="veh-tipo" onchange="calcularSOAT()">
               <option value="">Seleccionar...</option>
               <option>Automóvil particular</option><option>SUV / Camioneta</option>
               <option>Pickup</option><option>Van / Minivan</option><option>Taxi</option><option>Moto</option>
@@ -343,6 +343,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--off);color:var(--text);mi
           <div class="field">
             <label>Valor comercial (COP) *</label>
             <input type="text" id="veh-valor" placeholder="$45.000.000" oninput="fmtVal(this)">
+          </div>
+          <div class="field">
+            <label>Valor SOAT 2026 (COP)
+              <span style="background:#e8f4fd;color:#1565c0;font-size:11px;padding:2px 7px;border-radius:10px;margin-left:6px;font-weight:600;">Tarifa oficial</span>
+            </label>
+            <input type="text" id="veh-soat" placeholder="Se calcula automático" readonly
+              style="background:#f8f9ff;cursor:default;color:#1a237e;font-weight:600;">
+            <div id="veh-soat-detalle" style="font-size:11px;color:#666;margin-top:3px;display:none;"></div>
           </div>
         </div>
 
@@ -389,6 +397,45 @@ body{font-family:'DM Sans',sans-serif;background:var(--off);color:var(--text);mi
 </div>
 
 <script>
+function enviarWhatsApp(compania, producto, prima, mes) {
+  const nombre  = document.getElementById('cli-nombre').value.trim() || 'Cliente';
+  const cedula  = document.getElementById('cli-cedula').value.trim();
+  const marca   = document.getElementById('veh-marca').value  || '';
+  const modelo  = document.getElementById('veh-modelo').value || '';
+  const anio    = document.getElementById('veh-anio').value   || '';
+  const placa   = document.getElementById('veh-placa').value.toUpperCase() || '';
+  const ciudad  = document.getElementById('veh-ciudad').value || '';
+  const soat    = document.getElementById('veh-soat').value   || '';
+  const fasVal  = document.getElementById('veh-fasecolda-val').value || '';
+
+  const msg = [
+    '🚗 *COTIZACIÓN SEKIURY INSURE*',
+    '',
+    '👤 *Cliente*',
+    '• Nombre: ' + nombre,
+    cedula ? '• Cédula: ' + cedula : '',
+    '',
+    '🚘 *Vehículo*',
+    '• ' + [marca, modelo, anio].filter(Boolean).join(' '),
+    placa  ? '• Placa: ' + placa   : '',
+    ciudad ? '• Ciudad: ' + ciudad : '',
+    fasVal ? '• Valor Fasecolda: ' + fasVal : '',
+    soat   ? '• SOAT 2026: ' + soat         : '',
+    '',
+    '🏢 *Compañía seleccionada*',
+    '• ' + compania + ' — ' + producto,
+    '• Prima estimada: ' + prima,
+    '• ' + mes,
+    '',
+    '📅 Cotización generada: ' + new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}),
+    '',
+    '_Enviado desde Sekiury Insure_'
+  ].filter(l => l !== null && l !== undefined).join('\n');
+
+  const url = 'https://wa.me/573108959203?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
 /* ════════════════════════════
    CATÁLOGO FASECOLDA REAL
    Fuente: Guía Excel 354 Fasecolda
@@ -9318,6 +9365,7 @@ function actualizarValorFasecolda() {
       subEl.textContent = tipo + ' · Año ' + anio + ' · $' + val.toLocaleString('es-CO');
     }
   }
+  calcularSOAT();
 }
 
 function buscarFasecolda(codigo) {
@@ -9399,7 +9447,87 @@ function buscarFasecolda(codigo) {
     document.getElementById('fas-result-sub').textContent    =
       tipo + ' · Año ' + anioSel + ' · $' + (valor > 0 ? valor.toLocaleString('es-CO') : '—');
 
+    // ── SOAT ──
+    calcularSOAT();
+
   }, 250);
+}
+
+
+/* ════════════════════════════════════════
+   SOAT 2026 — Tarifas oficiales Superfinanciera
+   Circular 30-dic-2025, vigentes desde 1-ene-2026
+   Fuente: El Espectador / Superfinanciera
+   ════════════════════════════════════════ */
+
+function extraerCC(label) {
+  const m = label.match(/(\d{2,4})\s*CC/i);
+  return m ? parseInt(m[1]) : 0;
+}
+
+function calcularSOAT() {
+  const anioEl = document.getElementById('veh-anio');
+  const tipoEl = document.getElementById('veh-tipo');
+  const modEl  = document.getElementById('veh-modelo');
+  const soatEl = document.getElementById('veh-soat');
+  const detEl  = document.getElementById('veh-soat-detalle');
+
+  const anio  = parseInt(anioEl ? anioEl.value : '') || 0;
+  const tipo  = tipoEl ? tipoEl.value : '';
+  const label = modEl  ? (modEl.value || '') : '';
+
+  soatEl.value = '';
+  detEl.style.display = 'none';
+
+  if (!anio || !tipo) return;
+
+  const cc     = extraerCC(label);
+  const viejo  = (2026 - anio) >= 10;  // 10+ años de antigüedad
+
+  let tarifa = 0;
+  let detalle = '';
+
+  if (tipo === 'Moto') {
+    if (cc > 0 && cc <= 100) {
+      // Decreto 2497: 50% descuento
+      tarifa  = Math.round(256307 * 0.50);
+      detalle = 'Moto ≤ 100 cc (50% dto. Decreto 2497)';
+    } else if (cc <= 200) {
+      tarifa  = Math.round(343500 * 0.50);
+      detalle = 'Moto 101–200 cc (50% dto. Decreto 2497)';
+    } else {
+      tarifa  = viejo ? 760600 : 751000;
+      detalle = 'Moto > 200 cc' + (viejo ? ' ≥10 años' : ' <10 años');
+    }
+  } else if (tipo === 'Taxi') {
+    tarifa  = viejo ? 337500 : 282068;
+    detalle = 'Taxi' + (viejo ? ' ≥10 años' : ' <10 años');
+  } else if (tipo === 'SUV / Camioneta' || tipo === 'Pickup') {
+    if (cc > 0 && cc <= 1500) {
+      tarifa = viejo ? 953000  : 792800;
+    } else if (cc <= 2500) {
+      tarifa = viejo ? 1121400 : 946600;
+    } else {
+      tarifa = viejo ? 1274000 : 1110300;
+    }
+    detalle = 'Campero/Camioneta' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+  } else {
+    // Automóvil particular / Van / Minivan
+    if (cc > 0 && cc <= 1500) {
+      tarifa = viejo ? 592900 : 447300;
+    } else if (cc <= 2500) {
+      tarifa = viejo ? 677400 : 544700;
+    } else {
+      tarifa = viejo ? 754300 : 636000;
+    }
+    detalle = 'Automóvil particular' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+  }
+
+  if (tarifa > 0) {
+    soatEl.value = '$' + tarifa.toLocaleString('es-CO');
+    detEl.textContent = '📋 ' + detalle + ' · Tarifa máxima Superfinanciera 2026';
+    detEl.style.display = 'block';
+  }
 }
 
 /* ════════════════════════════
@@ -9515,7 +9643,14 @@ function renderResultados() {
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
         <div style="font-size:12px;color:var(--muted);"><span class="stars">${stars}</span> ${c.rating} · Pago: ${c.pago} · ${c.atencion}</div>
-        <button class="btn-secondary" style="font-size:12.5px;padding:8px 16px;" onclick="contactarAsesor('${c.nombre}')">Contactar →</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-secondary" style="font-size:12.5px;padding:8px 16px;" onclick="contactarAsesor('${c.nombre}')">Contactar →</button>
+          <button onclick="enviarWhatsApp('${c.nombre}','${c.producto}','${primaStr}','${mesStr}')"
+            style="background:#25D366;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.025.507 3.934 1.399 5.608L0 24l6.601-1.329C8.23 23.513 10.075 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818c-1.848 0-3.584-.49-5.088-1.346l-.366-.217-3.768.758.806-3.674-.239-.381C2.575 15.394 2.182 13.742 2.182 12 2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/></svg>
+            Me interesa
+          </button>
+        </div>
       </div>
     </div>`;
   }).join('');
