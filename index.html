@@ -3483,51 +3483,61 @@ function extraerCC(label) {
 }
 
 function calcularSOAT() {
-  var anioEl  = document.getElementById('veh-anio');
-  var tipoEl  = document.getElementById('veh-tipo');
-  var modEl   = document.getElementById('veh-modelo');
-  var soatEl  = document.getElementById('veh-soat');
-  var detEl   = document.getElementById('veh-soat-detalle');
+  var anioEl = document.getElementById('veh-anio');
+  var tipoEl = document.getElementById('veh-tipo');
+  var modEl  = document.getElementById('veh-modelo');
+  var soatEl = document.getElementById('veh-soat');
+  var detEl  = document.getElementById('veh-soat-detalle');
   if (!soatEl) return;
 
-  var anio    = parseInt(anioEl ? anioEl.value : '') || 0;
-  var tipo    = tipoEl ? tipoEl.value : '';
-  var label   = modEl  ? (modEl.value || '') : '';
+  var anio  = parseInt(anioEl ? anioEl.value : '') || 0;
+  var tipo  = tipoEl ? tipoEl.value : '';
+  var label = modEl  ? (modEl.value || '') : '';
 
   soatEl.value = '';
   if (detEl) detEl.style.display = 'none';
   if (!anio || !tipo) return;
 
-  var cc         = extraerCC(label);
-  var antiguedad = 2026 - anio;
-  var viejo      = antiguedad >= 10;
+  var cc    = extraerCC(label);
+  var viejo = (2026 - anio) >= 10;
 
-  var tarifa = 0, detalle = '';
+  // ─────────────────────────────────────────────────────────────
+  // TOTALES OFICIALES 2026 (prima + ADRES 52% + RUNT $2.400)
+  // Fuente: SFC Circular Externa 022/2025 – vigencia 01/01/2026
+  // ─────────────────────────────────────────────────────────────
+  var total = 0, categoria = '';
 
   if (tipo === 'Moto') {
-    if (cc > 0 && cc <= 100)       { tarifa = 255700; detalle = 'Moto ≤ 100 cc'; }
-    else if (cc <= 200)            { tarifa = 171750; detalle = 'Moto 101–200 cc (50% dcto Decreto 2497)'; }
-    else                           { tarifa = 796200; detalle = 'Moto > 200 cc'; }
+    if      (cc > 0 && cc <= 100) { total = 256200;  categoria = 'Moto < 100 cc'; }
+    else if (cc <= 200)           { total = 343300;  categoria = 'Moto 101–200 cc'; }
+    else                          { total = 761400;  categoria = 'Moto > 200 cc'; }
+
   } else if (tipo === 'Taxi') {
-    tarifa  = viejo ? 353000 : 281600;
-    detalle = 'Taxi / Servicio público' + (viejo ? ' ≥10 años' : ' <10 años');
+    // Tabla: Autos de Negocio / Taxis
+    if      (cc > 0 && cc <= 1500) { total = viejo ? 352000  : 281900;  }
+    else if (cc <= 2500)           { total = viejo ? 432400  : 350000;  }
+    else                           { total = viejo ? 529300  : 451400;  }
+    categoria = 'Taxi / Auto negocio' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+
   } else if (tipo === 'SUV / Camioneta' || tipo === 'Pickup') {
-    if      (cc > 0 && cc <= 1500) { tarifa = viejo ? 1109000 : 829300; }
-    else if (cc <= 2500)           { tarifa = viejo ? 1220700 : 968000; }
-    else                           { tarifa = viejo ? 1332600 : 1107400; }
-    detalle = 'Campero/Camioneta' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+    // Tabla: Camperos y Camionetas
+    if      (cc > 0 && cc <= 1500) { total = viejo ?  953000 :  792800; }
+    else if (cc <= 2500)           { total = viejo ? 1121400 :  946600; }
+    else                           { total = viejo ? 1274000 : 1110300; }
+    categoria = 'Campero / Camioneta' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+
   } else {
-    // Automóvil particular
-    if      (cc > 0 && cc <= 1500) { tarifa = viejo ? 619900 : 467600; }
-    else if (cc <= 2500)           { tarifa = viejo ? 708600 : 569700; }
-    else                           { tarifa = viejo ? 788900 : 665100; }
-    detalle = 'Automóvil particular' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
+    // Tabla: Vehículos Familiares hasta 5 pasajeros (automóvil particular)
+    if      (cc > 0 && cc <= 1500) { total = viejo ? 592900 : 447300; }
+    else if (cc <= 2500)           { total = viejo ? 677400 : 544700; }
+    else                           { total = viejo ? 754300 : 636000; }
+    categoria = 'Vehículo familiar / particular' + (cc > 0 ? ' ' + cc + 'cc' : '') + (viejo ? ' ≥10 años' : ' <10 años');
   }
 
-  if (tarifa > 0) {
-    soatEl.value = '$' + tarifa.toLocaleString('es-CO');
+  if (total > 0) {
+    soatEl.value = '$' + total.toLocaleString('es-CO');
     if (detEl) {
-      detEl.textContent = '📋 ' + detalle + ' · Tarifa máxima SFC 2026';
+      detEl.textContent = '📋 ' + categoria + ' · Tarifa total SFC 2026';
       detEl.style.display = 'block';
     }
   }
