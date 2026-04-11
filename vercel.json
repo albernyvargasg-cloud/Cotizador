@@ -1,19 +1,11 @@
 {
   "version": 2,
+  "regions": ["gru1"],
   "builds": [
-    {
-      "src": "api/qualitas.js",
-      "use": "@vercel/node"
-    }
+    { "src": "api/qualitas.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/qualitas",
-      "dest": "/api/qualitas.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/api/qualitas", "dest": "/api/qualitas.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
