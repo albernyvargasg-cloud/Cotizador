@@ -1,1 +1,19 @@
-
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/qualitas.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/qualitas",
+      "dest": "/api/qualitas.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
